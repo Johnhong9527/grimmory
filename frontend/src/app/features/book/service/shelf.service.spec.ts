@@ -6,8 +6,9 @@ import {createAuthServiceStub, createQueryClientHarness, flushQueryAsync, flushS
 import type {Shelf} from '../model/shelf.model';
 import {shelfDefinitionQueryKeys} from '../data/shelf-definition-query-keys';
 import {bookQueryKeys} from '../data/book-query-keys';
+import {BOOKS_QUERY_KEY} from './book-query-keys';
+import type {Book} from '../model/book.model';
 import {AuthService} from '../../../shared/service/auth.service';
-import {BookService} from './book.service';
 import {ShelfService} from './shelf.service';
 
 function buildShelf(overrides: Partial<Shelf> = {}): Shelf {
@@ -20,21 +21,25 @@ function buildShelf(overrides: Partial<Shelf> = {}): Shelf {
   };
 }
 
+function buildBook(id: number, shelves: Shelf[]): Book {
+  return {
+    id,
+    libraryId: 1,
+    libraryName: 'Main Library',
+    metadata: {bookId: id, title: `Book ${id}`},
+    shelves,
+  };
+}
+
 describe('ShelfService', () => {
   let service: ShelfService;
   let httpTestingController: HttpTestingController;
   let authService: ReturnType<typeof createAuthServiceStub>;
   let queryClientHarness: ReturnType<typeof createQueryClientHarness>;
-  let bookService: {
-    removeBooksFromShelf: ReturnType<typeof vi.fn>;
-  };
 
   beforeEach(() => {
     authService = createAuthServiceStub();
     queryClientHarness = createQueryClientHarness();
-    bookService = {
-      removeBooksFromShelf: vi.fn(),
-    };
 
     vi.spyOn(queryClientHarness.queryClient, 'invalidateQueries').mockResolvedValue(undefined);
     vi.spyOn(queryClientHarness.queryClient, 'removeQueries').mockImplementation(() => undefined);
@@ -44,7 +49,6 @@ describe('ShelfService', () => {
         ...queryClientHarness.providers,
         ShelfService,
         {provide: AuthService, useValue: authService},
-        {provide: BookService, useValue: bookService},
       ],
     });
 
@@ -147,8 +151,13 @@ describe('ShelfService', () => {
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: ['books'], exact: true});
   });
 
-  it('invalidates shelf caches and delegates book removal when deleting a shelf', () => {
+  it('clears the deleted shelf from cached books and invalidates book queries when deleting a shelf', () => {
     const invalidateQueriesSpy = vi.spyOn(queryClientHarness.queryClient, 'invalidateQueries').mockResolvedValue(undefined);
+    const deletedShelf = buildShelf({id: 11, name: 'To Delete'});
+    const keptShelf = buildShelf({id: 12, name: 'Keep'});
+    queryClientHarness.queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, [
+      buildBook(1, [deletedShelf, keptShelf]),
+    ]);
 
     httpTestingController.expectOne(req => req.url.endsWith('/api/v1/shelves')).flush([]);
 
@@ -159,7 +168,8 @@ describe('ShelfService', () => {
 
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: ['shelves'], exact: true});
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: shelfDefinitionQueryKeys.all()});
-    expect(bookService.removeBooksFromShelf).toHaveBeenCalledWith(11);
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({queryKey: bookQueryKeys.all()});
+    expect(queryClientHarness.queryClient.getQueryData<Book[]>(BOOKS_QUERY_KEY)?.[0].shelves).toEqual([keptShelf]);
   });
 
 });

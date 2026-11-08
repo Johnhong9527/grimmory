@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppComponent } from "./app.component";
 import { AuthInitializationService } from "./core/security/auth-initialization-service";
 import { RxStompService } from "./shared/websocket/rx-stomp.service";
-import { BookService } from "./features/book/service/book.service";
+import { BookSocketService } from "./features/book/service/book-socket.service";
 import { MetadataRefreshSubmissionService } from "./features/metadata/data/metadata-refresh-submission.service";
 import { NotificationEventService } from "./shared/websocket/notification-event.service";
 import { AppThemeService } from "./shared/service/app-theme.service";
@@ -38,7 +38,7 @@ describe("AppComponent", () => {
     watch: ReturnType<typeof vi.fn>;
     connectionState$: BehaviorSubject<RxStompState>;
   };
-  let bookService: {
+  let bookSocketService: {
     handleNewlyCreatedBook: ReturnType<typeof vi.fn>;
     handleBookUpdate: ReturnType<typeof vi.fn>;
     handleMultipleBookCoverPatches: ReturnType<typeof vi.fn>;
@@ -90,7 +90,7 @@ describe("AppComponent", () => {
       ),
       connectionState$: connectionState,
     };
-    bookService = {
+    bookSocketService = {
       handleNewlyCreatedBook: vi.fn(),
       handleBookUpdate: vi.fn(),
       handleMultipleBookCoverPatches: vi.fn(),
@@ -126,7 +126,7 @@ describe("AppComponent", () => {
           useValue: { initialized: signal(auth.ready) },
         },
         { provide: RxStompService, useValue: rxStompService },
-        { provide: BookService, useValue: bookService },
+        { provide: BookSocketService, useValue: bookSocketService },
         { provide: AuthorService, useValue: authorService },
         {
           provide: NotificationEventService,
@@ -180,14 +180,14 @@ describe("AppComponent", () => {
     expect(libraryHealthService.fetchHealth).not.toHaveBeenCalled();
   });
 
-  it("routes websocket book notifications to bookService", () => {
+  it("routes websocket book notifications to bookSocketService", () => {
     configureComponent();
 
     topics
       .get("/user/queue/book-add")
       ?.next({ body: JSON.stringify({ metadata: { title: "First" } }) });
 
-    expect(bookService.handleNewlyCreatedBook).toHaveBeenCalledWith({ metadata: { title: "First" } });
+    expect(bookSocketService.handleNewlyCreatedBook).toHaveBeenCalledWith({ metadata: { title: "First" } });
     expect(authorService.handleNewlyCreatedBook).toHaveBeenCalledWith({ metadata: { title: "First" } });
     expect(libraryImportProgressService.recordBookAdded).toHaveBeenCalledWith("First");
   });
@@ -220,15 +220,15 @@ describe("AppComponent", () => {
       .get("/user/queue/task-progress")
       ?.next({ body: JSON.stringify({ taskId: "task-2" }) });
 
-    expect(bookService.handleBookUpdate).toHaveBeenCalledWith(
+    expect(bookSocketService.handleBookUpdate).toHaveBeenCalledWith(
       { id: 1, libraryId: 1, libraryName: "Library" },
     );
-    expect(bookService.handleBookUpdate).toHaveBeenCalledWith(
+    expect(bookSocketService.handleBookUpdate).toHaveBeenCalledWith(
       { id: 2, libraryId: 1, libraryName: "Library" },
     );
-    expect(bookService.handleMultipleBookCoverPatches).toHaveBeenCalledWith([
+    expect(bookSocketService.handleMultipleBookCoverPatches).toHaveBeenCalledWith([
       { id: 1 }]);
-    expect(bookService.handleRemovedBookIds).toHaveBeenCalledWith([1, 2]);
+    expect(bookSocketService.handleRemovedBookIds).toHaveBeenCalledWith([1, 2]);
     expect(metadataProgressService.handleIncomingProgress).toHaveBeenCalledWith(
       { taskId: "task-1" },
     );
@@ -248,7 +248,7 @@ describe("AppComponent", () => {
     expect(taskService.handleTaskProgress).toHaveBeenCalledWith({
       taskId: "task-2",
     });
-    expect(bookService.handleTaskProgress).toHaveBeenCalledWith({
+    expect(bookSocketService.handleTaskProgress).toHaveBeenCalledWith({
       taskId: "task-2",
     });
   });
@@ -257,12 +257,12 @@ describe("AppComponent", () => {
     configureComponent();
 
     connectionState.next(RxStompState.OPEN);
-    expect(bookService.handleReconnect).not.toHaveBeenCalled();
+    expect(bookSocketService.handleReconnect).not.toHaveBeenCalled();
 
     connectionState.next(RxStompState.CLOSED);
     connectionState.next(RxStompState.OPEN);
 
-    expect(bookService.handleReconnect).toHaveBeenCalledOnce();
+    expect(bookSocketService.handleReconnect).toHaveBeenCalledOnce();
     expect(authorService.invalidateAuthors).toHaveBeenCalledOnce();
   });
 
@@ -282,6 +282,6 @@ describe("AppComponent", () => {
     topics
       .get("/user/queue/book-update")
       ?.next({ body: JSON.stringify({ id: 99 }) });
-    expect(bookService.handleBookUpdate).not.toHaveBeenCalled();
+    expect(bookSocketService.handleBookUpdate).not.toHaveBeenCalled();
   });
 });

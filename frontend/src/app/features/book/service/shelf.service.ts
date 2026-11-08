@@ -6,9 +6,8 @@ import {injectQuery, queryOptions, QueryClient} from '@tanstack/angular-query-ex
 
 import {Shelf} from '../model/shelf.model';
 import {invalidateShelfDefinitions} from '../data/shelf-definition-query-cache';
-import {invalidateAllBookCaches} from './legacy-book-cache';
+import {invalidateAllBookCaches, removeShelfFromBookCache} from './legacy-book-cache';
 import {SHELVES_QUERY_KEY} from './shelf-query-keys';
-import {BookService} from './book.service';
 import {API_CONFIG} from '../../../core/config/api-config';
 import {Book} from '../model/book.model';
 import {AuthService} from '../../../shared/service/auth.service';
@@ -19,7 +18,6 @@ const KOBO_SHELF_ICON = 'pi pi-tablet';
 @Service()
 export class ShelfService {
   private readonly http = inject(HttpClient);
-  private readonly bookService = inject(BookService);
   private readonly authService = inject(AuthService);
   private readonly queryClient = inject(QueryClient);
   private readonly url = `${API_CONFIG.BASE_URL}/api/v1/shelves`;
@@ -85,7 +83,7 @@ export class ShelfService {
   deleteShelf(id: number): Observable<void> {
     return this.http.delete<void>(`${this.url}/${id}`).pipe(
       tap(() => {
-        this.bookService.removeBooksFromShelf(id);
+        removeShelfFromBookCache(this.queryClient, id);
         void this.queryClient.invalidateQueries({queryKey: SHELVES_QUERY_KEY, exact: true});
         void invalidateShelfDefinitions(this.queryClient);
       })

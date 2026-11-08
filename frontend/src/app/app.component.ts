@@ -1,6 +1,6 @@
 import {Component, DestroyRef, effect, inject, OnDestroy, OnInit, signal} from '@angular/core';
 import {RxStompService} from './shared/websocket/rx-stomp.service';
-import {BookService} from './features/book/service/book.service';
+import {BookSocketService} from './features/book/service/book-socket.service';
 import {NotificationEventService} from './shared/websocket/notification-event.service';
 import {parseLogNotification} from './shared/websocket/model/log-notification.model';
 import {ConfirmDialog} from '@openng/optimus-ui/confirmdialog';
@@ -33,7 +33,7 @@ import {RxStompState} from '@stomp/rx-stomp';
 export class AppComponent implements OnInit, OnDestroy {
   private readonly appThemeService = inject(AppThemeService); // DO NOT REMOVE: Used to initialize app theme on startup
   private readonly authInit = inject(AuthInitializationService);
-  private readonly bookService = inject(BookService);
+  private readonly bookSocketService = inject(BookSocketService);
   private readonly authorService = inject(AuthorService);
   private readonly rxStompService = inject(RxStompService);
   private readonly notificationEventService = inject(NotificationEventService);
@@ -115,7 +115,7 @@ export class AppComponent implements OnInit, OnDestroy {
           return;
         }
         if (hasConnected) {
-          this.bookService.handleReconnect();
+          this.bookSocketService.handleReconnect();
           this.authorService.invalidateAuthors();
           return;
         }
@@ -126,28 +126,28 @@ export class AppComponent implements OnInit, OnDestroy {
       this.rxStompService.watch('/user/queue/book-add').subscribe(msg => {
         const book = JSON.parse(msg.body);
         this.libraryImportProgressService.recordBookAdded(book.metadata?.title || this.translocoService.translate('book.unknownTitle'));
-        this.bookService.handleNewlyCreatedBook(book);
+        this.bookSocketService.handleNewlyCreatedBook(book);
         this.authorService.handleNewlyCreatedBook(book);
       })
     );
     this.subscriptions.push(
       this.rxStompService.watch('/user/queue/book-update').subscribe(msg =>
-        this.bookService.handleBookUpdate(JSON.parse(msg.body))
+        this.bookSocketService.handleBookUpdate(JSON.parse(msg.body))
       )
     );
     this.subscriptions.push(
       this.rxStompService.watch('/user/queue/books-cover-update').subscribe(msg =>
-        this.bookService.handleMultipleBookCoverPatches(JSON.parse(msg.body))
+        this.bookSocketService.handleMultipleBookCoverPatches(JSON.parse(msg.body))
       )
     );
     this.subscriptions.push(
       this.rxStompService.watch('/user/queue/books-remove').subscribe(msg =>
-        this.bookService.handleRemovedBookIds(JSON.parse(msg.body))
+        this.bookSocketService.handleRemovedBookIds(JSON.parse(msg.body))
       )
     );
     this.subscriptions.push(
       this.rxStompService.watch('/user/queue/book-metadata-update').subscribe(msg =>
-        this.bookService.handleBookUpdate(JSON.parse(msg.body))
+        this.bookSocketService.handleBookUpdate(JSON.parse(msg.body))
       )
     );
     this.subscriptions.push(
@@ -173,7 +173,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.rxStompService.watch('/user/queue/task-progress').subscribe(msg => {
         const progress = JSON.parse(msg.body) as TaskProgressPayload;
         this.taskService.handleTaskProgress(progress);
-        this.bookService.handleTaskProgress(progress);
+        this.bookSocketService.handleTaskProgress(progress);
       })
     );
     this.subscriptions.push(

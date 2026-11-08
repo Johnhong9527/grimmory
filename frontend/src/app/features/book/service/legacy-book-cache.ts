@@ -243,6 +243,17 @@ export function patchBookFieldsInCache(queryClient: QueryClient, updates: {bookI
   })));
 }
 
+// Shelf deletion is handled outside BookService, so this keeps the legacy list cache in sync
+// without instantiating BookService (and its eager full-library query).
+export function removeShelfFromBookCache(queryClient: QueryClient, shelfId: number): void {
+  queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current =>
+    (current ?? []).map(book => ({
+      ...book,
+      shelves: book.shelves?.filter(shelf => shelf.id !== shelfId),
+    })));
+  void invalidateAllBookQueries(queryClient);
+}
+
 export function patchAttachedBookFilesInLegacyCache(
   queryClient: QueryClient,
   targetFiles: Pick<Book, 'id' | 'primaryFile' | 'alternativeFormats' | 'supplementaryFiles'>,

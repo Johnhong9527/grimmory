@@ -18,11 +18,11 @@ import {
   bookDetailQueryKey,
   bookRecommendationsQueryKey,
 } from './book-query-keys';
-import {invalidateAllBookQueries} from '../data/book-query-cache';
 import {
   invalidateAllBookCaches,
   invalidateDeletedBookQueries,
   patchBooksInCache,
+  removeShelfFromBookCache,
 } from './legacy-book-cache';
 
 @Service()
@@ -112,13 +112,7 @@ export class BookService {
   }
 
   removeBooksFromShelf(shelfId: number): void {
-    this.queryClient.setQueryData<Book[]>(BOOKS_QUERY_KEY, current =>
-      (current ?? []).map(book => ({
-        ...book,
-        shelves: book.shelves?.filter(shelf => shelf.id !== shelfId),
-      }))
-    );
-    void invalidateAllBookQueries(this.queryClient);
+    removeShelfFromBookCache(this.queryClient, shelfId);
   }
 
   /*------------------ Book Retrieval ------------------*/
